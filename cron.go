@@ -48,6 +48,8 @@ type EntryID int
 
 // Entry consists of a schedule and the func to execute on that schedule.
 type Entry struct {
+	// 区分不同的 crontab 标志
+	Tag string
 	// ID is the cron-assigned ID of this entry, which may be used to look up a
 	// snapshot or remove it.
 	ID EntryID
@@ -97,17 +99,17 @@ func (s byTime) Less(i, j int) bool {
 //
 // Available Settings
 //
-//   Time Zone
-//     Description: The time zone in which schedules are interpreted
-//     Default:     time.Local
+//	Time Zone
+//	  Description: The time zone in which schedules are interpreted
+//	  Default:     time.Local
 //
-//   Parser
-//     Description: Parser converts cron spec strings into cron.Schedules.
-//     Default:     Accepts this spec: https://en.wikipedia.org/wiki/Cron
+//	Parser
+//	  Description: Parser converts cron spec strings into cron.Schedules.
+//	  Default:     Accepts this spec: https://en.wikipedia.org/wiki/Cron
 //
-//   Chain
-//     Description: Wrap submitted jobs to customize behavior.
-//     Default:     A chain that recovers panics and logs them to stderr.
+//	Chain
+//	  Description: Wrap submitted jobs to customize behavior.
+//	  Default:     A chain that recovers panics and logs them to stderr.
 //
 // See "cron.With*" to modify the default behavior.
 func New(opts ...Option) *Cron {
@@ -142,6 +144,10 @@ func (c *Cron) AddFunc(spec string, cmd func()) (EntryID, error) {
 	return c.AddJob(spec, FuncJob(cmd))
 }
 
+func (c *Cron) AddTagFunc(tag, spec string, cmd func()) (EntryID, error) {
+	return c.AddTagJob(tag, spec, FuncJob(cmd))
+}
+
 // AddJob adds a Job to the Cron to be run on the given schedule.
 // The spec is parsed using the time zone of this Cron instance as the default.
 // An opaque ID is returned that can be used to later remove it.
@@ -153,6 +159,14 @@ func (c *Cron) AddJob(spec string, cmd Job) (EntryID, error) {
 	return c.Schedule(schedule, cmd), nil
 }
 
+func (c *Cron) AddTagJob(tag, spec string, cmd Job) (EntryID, error) {
+	schedule, err := c.parser.Parse(spec)
+	if err != nil {
+		return 0, err
+	}
+	return c.ScheduleWidthTag(tag, schedule, cmd), nil
+}
+
 // Schedule adds a Job to the Cron to be run on the given schedule.
 // The job is wrapped with the configured Chain.
 func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
@@ -160,6 +174,25 @@ func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
 	defer c.runningMu.Unlock()
 	c.nextID++
 	entry := &Entry{
+		ID:         c.nextID,
+		Schedule:   schedule,
+		WrappedJob: c.chain.Then(cmd),
+		Job:        cmd,
+	}
+	if !c.running {
+		c.entries = append(c.entries, entry)
+	} else {
+		c.add <- entry
+	}
+	return entry.ID
+}
+
+func (c *Cron) ScheduleWidthTag(tag string, schedule Schedule, cmd Job) EntryID {
+	c.runningMu.Lock()
+	defer c.runningMu.Unlock()
+	c.nextID++
+	entry := &Entry{
+		Tag:        tag,
 		ID:         c.nextID,
 		Schedule:   schedule,
 		WrappedJob: c.chain.Then(cmd),

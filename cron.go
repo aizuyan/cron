@@ -368,7 +368,7 @@ func (c *Cron) run() {
 				continue
 
 			case <-usrSig:
-				c.PrettyEntries()
+				go c.PrettyEntries()
 				continue
 
 			case <-c.stop:

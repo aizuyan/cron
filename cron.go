@@ -236,13 +236,13 @@ func (c *Cron) Entries() []Entry {
 	return c.entrySnapshot()
 }
 
-// 打印 脚本内容
-func (c *Cron) Show() {
+// 格式化表格打印制定信息表
+func (c *Cron) PrettyEntries() {
 	entries := c.Entries()
 	var data [][]string
 	for _, entry := range entries {
 		valueOfSchedule := reflect.ValueOf(entry.Schedule)
-		spec := valueOfSchedule.Interface().(SpecSchedule)
+		spec := valueOfSchedule.Interface().(*SpecSchedule)
 		data = append(data, []string{
 			strconv.Itoa(int(entry.ID)),
 			entry.Tag,

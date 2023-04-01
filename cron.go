@@ -3,7 +3,6 @@ package cron
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/signal"
 	"reflect"
@@ -248,7 +247,7 @@ func (c *Cron) PrettyEntries() {
 		data = append(data, []string{
 			strconv.Itoa(int(entry.ID)),
 			entry.Tag,
-			fmt.Sprintf("%d", spec.Month),
+			spec.Spec,
 			entry.Prev.Format("2006-01-02 15:04:05"),
 			entry.Next.Format("2006-01-02 15:04:05"),
 		})

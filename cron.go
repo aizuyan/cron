@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"reflect"
 	"sort"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -320,6 +322,10 @@ func (c *Cron) run() {
 		c.logger.Info("schedule", "now", now, "entry", entry.ID, "next", entry.Next)
 	}
 
+	// usr1 to show pretty entries
+	usrSig := make(chan os.Signal, 1)
+	signal.Notify(usrSig, syscall.SIGUSR1)
+
 	for {
 		// Determine the next entry to run.
 		sort.Sort(byTime(c.entries))
@@ -359,6 +365,10 @@ func (c *Cron) run() {
 
 			case replyChan := <-c.snapshot:
 				replyChan <- c.entrySnapshot()
+				continue
+
+			case <-usrSig:
+				c.PrettyEntries()
 				continue
 
 			case <-c.stop:

@@ -2,9 +2,16 @@ package cron
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
+	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/olekukonko/tablewriter"
 )
 
 // Cron keeps track of any number of entries, invoking the associated func as
@@ -48,8 +55,9 @@ type EntryID int
 
 // Entry consists of a schedule and the func to execute on that schedule.
 type Entry struct {
-	// 区分不同的 crontab 标志
+	// Tag is the human readable identify of this entry.
 	Tag string
+
 	// ID is the cron-assigned ID of this entry, which may be used to look up a
 	// snapshot or remove it.
 	ID EntryID
@@ -144,8 +152,9 @@ func (c *Cron) AddFunc(spec string, cmd func()) (EntryID, error) {
 	return c.AddJob(spec, FuncJob(cmd))
 }
 
-func (c *Cron) AddTagFunc(tag, spec string, cmd func()) (EntryID, error) {
-	return c.AddTagJob(tag, spec, FuncJob(cmd))
+// add func with custom uniq tag
+func (c *Cron) AddFuncWithTag(tag, spec string, cmd func()) (EntryID, error) {
+	return c.AddJobWithTag(tag, spec, FuncJob(cmd))
 }
 
 // AddJob adds a Job to the Cron to be run on the given schedule.
@@ -159,7 +168,8 @@ func (c *Cron) AddJob(spec string, cmd Job) (EntryID, error) {
 	return c.Schedule(schedule, cmd), nil
 }
 
-func (c *Cron) AddTagJob(tag, spec string, cmd Job) (EntryID, error) {
+// add job with uniq tag
+func (c *Cron) AddJobWithTag(tag, spec string, cmd Job) (EntryID, error) {
 	schedule, err := c.parser.Parse(spec)
 	if err != nil {
 		return 0, err
@@ -187,9 +197,17 @@ func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
 	return entry.ID
 }
 
+// with tag
 func (c *Cron) ScheduleWidthTag(tag string, schedule Schedule, cmd Job) EntryID {
 	c.runningMu.Lock()
 	defer c.runningMu.Unlock()
+	// 判断是否已经有了
+	for _, entry := range c.entries {
+		if tag == entry.Tag {
+			c.logger.Error(errors.New("Entry tag duplicate"), "Tag %s had exists!", tag)
+			panic("Entry tag " + tag + " duplicate")
+		}
+	}
 	c.nextID++
 	entry := &Entry{
 		Tag:        tag,
@@ -216,6 +234,29 @@ func (c *Cron) Entries() []Entry {
 		return <-replyChan
 	}
 	return c.entrySnapshot()
+}
+
+// 打印 脚本内容
+func (c *Cron) Show() {
+	entries := c.Entries()
+	var data [][]string
+	for _, entry := range entries {
+		valueOfSchedule := reflect.ValueOf(entry.Schedule)
+		spec := valueOfSchedule.Interface().(SpecSchedule)
+		data = append(data, []string{
+			strconv.Itoa(int(entry.ID)),
+			entry.Tag,
+			fmt.Sprintf("%d", spec.Month),
+			entry.Prev.Format("2006-01-02 15:04:05"),
+			entry.Next.Format("2006-01-02 15:04:05"),
+		})
+	}
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"ID", "Tag", "Spec", "Prev", "Next"})
+	for _, v := range data {
+		table.Append(v)
+	}
+	table.Render()
 }
 
 // Location gets the time zone location

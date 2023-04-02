@@ -144,21 +144,22 @@ func TestParseSchedule(t *testing.T) {
 		expr     string
 		expected Schedule
 	}{
-		{secondParser, "0 5 * * * *", every5min(time.Local)},
-		{standardParser, "5 * * * *", every5min(time.Local)},
-		{secondParser, "CRON_TZ=UTC  0 5 * * * *", every5min(time.UTC)},
-		{standardParser, "CRON_TZ=UTC  5 * * * *", every5min(time.UTC)},
-		{secondParser, "CRON_TZ=Asia/Tokyo 0 5 * * * *", every5min(tokyo)},
+		{secondParser, "0 5 * * * *", every5min(time.Local, "0 5 * * * *")},
+		{standardParser, "5 * * * *", every5min(time.Local, "5 * * * *")},
+		{secondParser, "CRON_TZ=UTC  0 5 * * * *", every5min(time.UTC, "CRON_TZ=UTC  0 5 * * * *")},
+		{standardParser, "CRON_TZ=UTC  5 * * * *", every5min(time.UTC, "CRON_TZ=UTC  5 * * * *")},
+		{secondParser, "CRON_TZ=Asia/Tokyo 0 5 * * * *", every5min(tokyo, "CRON_TZ=Asia/Tokyo 0 5 * * * *")},
 		{secondParser, "@every 5m", ConstantDelaySchedule{5 * time.Minute}},
-		{secondParser, "@midnight", midnight(time.Local)},
-		{secondParser, "TZ=UTC  @midnight", midnight(time.UTC)},
-		{secondParser, "TZ=Asia/Tokyo @midnight", midnight(tokyo)},
-		{secondParser, "@yearly", annual(time.Local)},
-		{secondParser, "@annually", annual(time.Local)},
+		{secondParser, "@midnight", midnight(time.Local, "@midnight")},
+		{secondParser, "TZ=UTC  @midnight", midnight(time.UTC, "TZ=UTC  @midnight")},
+		{secondParser, "TZ=Asia/Tokyo @midnight", midnight(tokyo, "TZ=Asia/Tokyo @midnight")},
+		{secondParser, "@yearly", annual(time.Local, "@yearly")},
+		{secondParser, "@annually", annual(time.Local, "@annually")},
 		{
 			parser: secondParser,
 			expr:   "* 5 * * * *",
 			expected: &SpecSchedule{
+				Spec:     "* 5 * * * *",
 				Second:   all(seconds),
 				Minute:   1 << 5,
 				Hour:     all(hours),
@@ -187,9 +188,9 @@ func TestOptionalSecondSchedule(t *testing.T) {
 		expr     string
 		expected Schedule
 	}{
-		{"0 5 * * * *", every5min(time.Local)},
-		{"5 5 * * * *", every5min5s(time.Local)},
-		{"5 * * * *", every5min(time.Local)},
+		{"0 5 * * * *", every5min(time.Local, "0 5 * * * *")},
+		{"5 5 * * * *", every5min5s(time.Local, "5 5 * * * *")},
+		{"5 * * * *", every5min(time.Local, "5 * * * *")},
 	}
 
 	for _, c := range entries {
@@ -320,7 +321,7 @@ func TestStandardSpecSchedule(t *testing.T) {
 	}{
 		{
 			expr:     "5 * * * *",
-			expected: &SpecSchedule{1 << seconds.min, 1 << 5, all(hours), all(dom), all(months), all(dow), time.Local},
+			expected: &SpecSchedule{1 << seconds.min, 1 << 5, all(hours), all(dom), all(months), all(dow), time.Local, "5 * * * *"},
 		},
 		{
 			expr:     "@every 5m",
@@ -358,19 +359,19 @@ func TestNoDescriptorParser(t *testing.T) {
 	}
 }
 
-func every5min(loc *time.Location) *SpecSchedule {
-	return &SpecSchedule{1 << 0, 1 << 5, all(hours), all(dom), all(months), all(dow), loc}
+func every5min(loc *time.Location, spec string) *SpecSchedule {
+	return &SpecSchedule{1 << 0, 1 << 5, all(hours), all(dom), all(months), all(dow), loc, spec}
 }
 
-func every5min5s(loc *time.Location) *SpecSchedule {
-	return &SpecSchedule{1 << 5, 1 << 5, all(hours), all(dom), all(months), all(dow), loc}
+func every5min5s(loc *time.Location, spec string) *SpecSchedule {
+	return &SpecSchedule{1 << 5, 1 << 5, all(hours), all(dom), all(months), all(dow), loc, spec}
 }
 
-func midnight(loc *time.Location) *SpecSchedule {
-	return &SpecSchedule{1, 1, 1, all(dom), all(months), all(dow), loc}
+func midnight(loc *time.Location, spec string) *SpecSchedule {
+	return &SpecSchedule{1, 1, 1, all(dom), all(months), all(dow), loc, spec}
 }
 
-func annual(loc *time.Location) *SpecSchedule {
+func annual(loc *time.Location, spec string) *SpecSchedule {
 	return &SpecSchedule{
 		Second:   1 << seconds.min,
 		Minute:   1 << minutes.min,
@@ -379,5 +380,6 @@ func annual(loc *time.Location) *SpecSchedule {
 		Month:    1 << months.min,
 		Dow:      all(dow),
 		Location: loc,
+		Spec:     spec,
 	}
 }

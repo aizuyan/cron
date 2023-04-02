@@ -85,6 +85,7 @@ func NewParser(options ParseOption) Parser {
 // It returns a descriptive error if the spec is not valid.
 // It accepts crontab specs and features configured by NewParser.
 func (p Parser) Parse(spec string) (Schedule, error) {
+	originSpec := spec
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("empty spec string")
 	}
@@ -106,7 +107,7 @@ func (p Parser) Parse(spec string) (Schedule, error) {
 		if p.options&Descriptor == 0 {
 			return nil, fmt.Errorf("parser does not accept descriptors: %v", spec)
 		}
-		return parseDescriptor(spec, loc)
+		return parseDescriptor(originSpec, spec, loc)
 	}
 
 	// Split on whitespace.
@@ -141,7 +142,7 @@ func (p Parser) Parse(spec string) (Schedule, error) {
 	}
 
 	return &SpecSchedule{
-		Spec:     spec,
+		Spec:     originSpec,
 		Second:   second,
 		Minute:   minute,
 		Hour:     hour,
@@ -364,10 +365,11 @@ func all(r bounds) uint64 {
 }
 
 // parseDescriptor returns a predefined schedule for the expression, or error if none matches.
-func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
+func parseDescriptor(oriDesc, descriptor string, loc *time.Location) (Schedule, error) {
 	switch descriptor {
 	case "@yearly", "@annually":
 		return &SpecSchedule{
+			Spec:     oriDesc,
 			Second:   1 << seconds.min,
 			Minute:   1 << minutes.min,
 			Hour:     1 << hours.min,
@@ -379,6 +381,7 @@ func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
 
 	case "@monthly":
 		return &SpecSchedule{
+			Spec:     oriDesc,
 			Second:   1 << seconds.min,
 			Minute:   1 << minutes.min,
 			Hour:     1 << hours.min,
@@ -390,6 +393,7 @@ func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
 
 	case "@weekly":
 		return &SpecSchedule{
+			Spec:     oriDesc,
 			Second:   1 << seconds.min,
 			Minute:   1 << minutes.min,
 			Hour:     1 << hours.min,
@@ -401,6 +405,7 @@ func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
 
 	case "@daily", "@midnight":
 		return &SpecSchedule{
+			Spec:     oriDesc,
 			Second:   1 << seconds.min,
 			Minute:   1 << minutes.min,
 			Hour:     1 << hours.min,
@@ -412,6 +417,7 @@ func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
 
 	case "@hourly":
 		return &SpecSchedule{
+			Spec:     oriDesc,
 			Second:   1 << seconds.min,
 			Minute:   1 << minutes.min,
 			Hour:     all(hours),

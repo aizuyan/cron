@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -326,6 +327,10 @@ func (c *Cron) run() {
 	usrSig := make(chan os.Signal, 1)
 	signal.Notify(usrSig, syscall.SIGUSR1)
 
+	// usr2 to some action from file
+	usrSig2 := make(chan os.Signal, 1)
+	signal.Notify(usrSig2, syscall.SIGUSR2)
+
 	for {
 		// Determine the next entry to run.
 		sort.Sort(byTime(c.entries))
@@ -370,6 +375,27 @@ func (c *Cron) run() {
 			case <-usrSig:
 				go c.PrettyEntries()
 				continue
+
+			case <-usrSig2:
+				actionByte, err := os.ReadFile("/tmp/cron.action")
+				if err != nil {
+					c.logger.Error(errors.New("read from file /tmp/cron.action failed"),
+						"SIGUSR2 read from file failed.")
+					continue
+				}
+				action := strings.Fields(string(actionByte))
+				if len(action) != 2 {
+					c.logger.Error(errors.New("read from file /tmp/cron.action failed"),
+						"SIGUSR2 read from file failed, must two filed.")
+					continue
+				}
+				switch action[0] {
+				case "removeTag":
+					timer.Stop()
+					now = c.now()
+					c.removeEntryByTag(action[1])
+					c.logger.Info("removedByTag", "tag", action[1])
+				}
 
 			case <-c.stop:
 				timer.Stop()
@@ -432,6 +458,16 @@ func (c *Cron) removeEntry(id EntryID) {
 	var entries []*Entry
 	for _, e := range c.entries {
 		if e.ID != id {
+			entries = append(entries, e)
+		}
+	}
+	c.entries = entries
+}
+
+func (c *Cron) removeEntryByTag(tag string) {
+	var entries []*Entry
+	for _, e := range c.entries {
+		if e.Tag != tag {
 			entries = append(entries, e)
 		}
 	}

@@ -177,7 +177,7 @@ func (c *Cron) AddJobWithTag(tag, spec string, cmd Job) (EntryID, error) {
 	if err != nil {
 		return 0, err
 	}
-	return c.ScheduleWidthTag(tag, spec, schedule, cmd), nil
+	return c.ScheduleWidthInfo(tag, spec, schedule, cmd), nil
 }
 
 // Schedule adds a Job to the Cron to be run on the given schedule.
@@ -201,7 +201,7 @@ func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
 }
 
 // with tag
-func (c *Cron) ScheduleWidthTag(tag, spec string, schedule Schedule, cmd Job) EntryID {
+func (c *Cron) ScheduleWidthInfo(tag, spec string, schedule Schedule, cmd Job) EntryID {
 	c.runningMu.Lock()
 	defer c.runningMu.Unlock()
 	// 判断是否已经有了

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -58,6 +57,9 @@ type EntryID int
 type Entry struct {
 	// Tag is the human readable identify of this entry.
 	Tag string
+
+	// Spec is the origin
+	Spec string
 
 	// ID is the cron-assigned ID of this entry, which may be used to look up a
 	// snapshot or remove it.
@@ -175,7 +177,7 @@ func (c *Cron) AddJobWithTag(tag, spec string, cmd Job) (EntryID, error) {
 	if err != nil {
 		return 0, err
 	}
-	return c.ScheduleWidthTag(tag, schedule, cmd), nil
+	return c.ScheduleWidthTag(tag, spec, schedule, cmd), nil
 }
 
 // Schedule adds a Job to the Cron to be run on the given schedule.
@@ -199,7 +201,7 @@ func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
 }
 
 // with tag
-func (c *Cron) ScheduleWidthTag(tag string, schedule Schedule, cmd Job) EntryID {
+func (c *Cron) ScheduleWidthTag(tag, spec string, schedule Schedule, cmd Job) EntryID {
 	c.runningMu.Lock()
 	defer c.runningMu.Unlock()
 	// 判断是否已经有了
@@ -212,6 +214,7 @@ func (c *Cron) ScheduleWidthTag(tag string, schedule Schedule, cmd Job) EntryID 
 	c.nextID++
 	entry := &Entry{
 		Tag:        tag,
+		Spec:       spec,
 		ID:         c.nextID,
 		Schedule:   schedule,
 		WrappedJob: c.chain.Then(cmd),
@@ -242,12 +245,10 @@ func (c *Cron) PrettyEntries() {
 	entries := c.Entries()
 	var data [][]string
 	for _, entry := range entries {
-		valueOfSchedule := reflect.ValueOf(entry.Schedule)
-		spec := valueOfSchedule.Interface().(*SpecSchedule)
 		data = append(data, []string{
 			strconv.Itoa(int(entry.ID)),
 			entry.Tag,
-			spec.Spec,
+			entry.Spec,
 			entry.Prev.Format("2006-01-02 15:04:05"),
 			entry.Next.Format("2006-01-02 15:04:05"),
 		})

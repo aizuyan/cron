@@ -9,9 +9,6 @@ type SpecSchedule struct {
 
 	// Override location for this schedule.
 	Location *time.Location
-
-	// Spec is the schedule origin info
-	Spec string
 }
 
 // bounds provides a range of acceptable values (plus a map of name to value).
